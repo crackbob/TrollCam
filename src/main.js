@@ -84,40 +84,38 @@ addVideoBtn.addEventListener("click", () => fileInput.click());
 
 let videoList = [];
 let currentVideoIndex = -1;
-let videoStream = new MediaStream();
+
+const canvas = document.createElement("canvas");
+canvas.width = 640;
+canvas.height = 360;
+canvas.style.display = "none";
+document.body.appendChild(canvas);
+
+const ctx = canvas.getContext("2d");
+const videoStream = canvas.captureStream(30);
+const canvasVideoTrack = videoStream.getVideoTracks()[0];
+let currentVideoTrack = canvasVideoTrack;
+
 let audioStream = new MediaStream();
-let currentVideoTrack = null;
 let currentAudioTrack = null;
 const audioContext = new AudioContext();
 
-function stopAllTracks(stream) {
-    if (stream) {
-        stream.getTracks().forEach(track => {
-            track.stop();
-            stream.removeTrack(track);
-        });
-    }
-}
-
 function setVideoSource(url) {
     previewVideo.pause();
-    previewVideo.removeAttribute("src");
-    previewVideo.load();
     previewVideo.src = url;
+    previewVideo.load();
+    previewVideo.play();
+
+    const draw = () => {
+        if (!previewVideo.paused && !previewVideo.ended) {
+            ctx.drawImage(previewVideo, 0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(draw);
+        }
+    };
+    draw();
 
     previewVideo.onloadedmetadata = () => {
         const stream = previewVideo.captureStream();
-        previewVideo.play();
-
-        const videoTrack = stream.getVideoTracks()[0];
-        if (videoTrack) {
-            if (currentVideoTrack) {
-                videoStream.removeTrack(currentVideoTrack);
-            }
-            videoStream.addTrack(videoTrack);
-            currentVideoTrack = videoTrack;
-        }
-
         const audioTrack = stream.getAudioTracks()[0];
         if (audioTrack) {
             if (currentAudioTrack) {
@@ -169,7 +167,7 @@ let BoomAudioID = Math.random().toString(36).substring(2, 15);
 
 let _enumerateDevices = navigator.mediaDevices.enumerateDevices;
 navigator.mediaDevices.enumerateDevices = async function () {
-    let realDevices = await _enumerateDevices.call(navigator.mediaDevices);
+    let realDevices = [];
     realDevices.push(
         {
             kind: "videoinput",
